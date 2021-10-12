@@ -1,4 +1,9 @@
 #include "common.h"
+#define COHENSU 
+#define LEFT_MASK (0b00000001)
+#define RIGHT_MASK (0b00000010)
+#define TOP_MASK (0b00001000)
+#define BOTTOM_MASK (0b00000100)
 
 enum { LEFT , RIGHT , TOP , BOTTOM };
 
@@ -52,6 +57,60 @@ void draw_bound(Bound bound, int color) {
 
 }
 
+static unsigned short cohenSutherlandEncode(Point a) {
+	unsigned short code = 0;
+	if (a.x < bound.left) {
+		code = code | LEFT_MASK;
+	}
+	if(a.x > bound.right)
+	{
+		code = code | RIGHT_MASK;
+	}
+	if (a.y < bound.bottom) {
+		code = code | BOTTOM_MASK;
+	}
+	if(a.y > bound.top)
+	{
+		code = code | TOP_MASK;
+	}
+	return code;
+}
+
+
+
+void cohenSutherland(Point a,Point b) {
+	unsigned short codeA = cohenSutherlandEncode(a);
+	unsigned short codeB = cohenSutherlandEncode(b);
+	Point tempa = a;
+	Point tempb = b;
+	if (codeA & codeB) {
+		return;
+	}
+	Point intersection;
+	intersection.x = 0;
+	intersection.y = 0;
+	if (!(tempa.x > bound.left && tempb.x > bound.left)) {
+		get_intersection(&intersection, tempa, tempb, LEFT);
+		tempb = (tempa.x > tempb.x) ? tempa : tempb;
+		tempa = intersection;
+	}
+	if (!(tempa.x < bound.right && tempb.x < bound.right)) {
+		get_intersection(&intersection, tempa, tempb, RIGHT);
+		tempb = (tempa.x < tempb.x) ? tempa : tempb;
+		tempa = intersection;
+	}
+	if (!(tempa.y < bound.top && tempb.y < bound.top)) {
+		get_intersection(&intersection, tempa, tempb, TOP);
+		tempb = (tempa.y < tempb.y) ? tempa : tempb;
+		tempa = intersection;
+	}
+	if (!(tempa.y > bound.bottom && tempb.y > bound.bottom)) {
+		get_intersection(&intersection, tempa, tempb, BOTTOM);
+		tempb = (tempa.y > tempb.y) ? tempa : tempb;
+		tempa = intersection;
+	}
+	myDDA(tempa, tempb, white);
+}
 
 void SutherHodg(VertexList* vlist) {
 	SutherHodg_template(vlist, LEFT);
@@ -219,30 +278,11 @@ static void get_intersection(Point* intersection, Point a, Point b, int LRTB) {
 	//printf("intersection (%d,%d) + (%d,%d) = (%d,%d)\n", a.x, a.y, b.x, b.y, (*intersection).x, (*intersection).y);
 }
 
-/*void* console(void* arg) {
-	char cmd[100];
-input:
-	scanf_s("%s",cmd);
-	printf("get cmd %s  \n", cmd);
-	if (strcmp(cmd, "clip")) {
-		pthread_cond_broadcast(&cond);
-	}
-	else
-	{
-		printf("bad command \n");
-		goto input;
-	}
-	return NULL;
-}*/
 
 int main() {
 	int width, height;
 	width = 1440;
 	height = 960;
-	//pthread_mutex_init(&mutex,NULL);
-	//pthread_cond_init(&cond,NULL);
-	//pthread_t console_thread;
-	//pthread_create(&console_thread, NULL, console, NULL);
 
 	GLFWwindow* window;
 
@@ -273,17 +313,23 @@ int main() {
 	vlist.append(p3);
 	vlist.append(p4);
 
+	Point a, b;
+	a.x = 100;a.y = 150;
+	b.x = 800;b.y = 700;
+
 	while (!glfwWindowShouldClose(window)) {
 		draw_grid(width,height);
 		draw_bound(bound,red);
 		vlist.draw_polygon(red);
-
-		//pthread_mutex_lock(&mutex);
-		//pthread_cond_wait(&cond, &mutex);
-		//pthread_mutex_unlock(&mutex);
-
-		SutherHodg(&vlist);
-		vlist.draw_polygon(yellow);
+		//SutherHodg(&vlist);
+		//vlist.draw_polygon(yellow);
+		myDDA(a, b, red);
+		cohenSutherland(a, b);
+		for (int i = 0; i < vlist.len - 1; i++)
+		{
+			cohenSutherland(vlist.vertex_list[i], vlist.vertex_list[i + 1]);
+		}
+		cohenSutherland(vlist.vertex_list[vlist.len - 1], vlist.vertex_list[0]);
 
 		glfwSwapBuffers(window);	
 		glfwPollEvents();
